@@ -1,23 +1,39 @@
+# Import packages
 import streamlit as st
 from snowflake.snowpark.functions import col
 
-# App title
-st.title("📝 Simple Name Collector")
+# App title and instructions
+st.title("🥤 My Parents' New Healthy Diner! 🥤")
+st.write("Choose the fruits you want in your custom Smoothie!")
 
-# Input field
-user_name = st.text_input("Enter your name:")
+# Name on smoothie input
+name_on_order = st.text_input("Name on Smoothie:")
+st.write("The name on your Smoothie will be:", name_on_order)
 
-# Connect to Snowflake
-cnx = st.connection("snowflake", type="snowflake")  # Load secrets.toml
+# Create connection using Streamlit's native connection manager
+cnx = st.connection("Snowflake")
 session = cnx.session()
 
-# Store in Snowflake on button click
-if st.button("Submit"):
-    if user_name:
+# Get fruit options from Snowflake
+fruit_df = session.table("SMOOTHIES.PUBLIC.FRUIT_OPTIONS").select(col('FRUIT_NAME')).to_pandas()
+fruit_names = fruit_df['FRUIT_NAME'].tolist()
+
+# Multi-select for ingredients
+ingredients_list = st.multiselect(
+    'Choose up to 5 ingredients:',
+    fruit_names,
+    max_selections=5
+)
+
+# Process order
+if ingredients_list:
+    ingredients_string = ", ".join(ingredients_list)
+
+    if st.button("Submit Order"):
+        # Insert order into Snowflake
         session.sql(f"""
-            INSERT INTO SMOOTHIES.PUBLIC.NAMES (name)
-            VALUES ('{user_name}')
+            INSERT INTO SMOOTHIES.PUBLIC.ORDERS (name_on_order, ingredients)
+            VALUES ('{name_on_order}', '{ingredients_string}')
         """).collect()
-        st.success(f"✅ '{user_name}' added to the database!")
-    else:
-        st.warning("Please enter a name before submitting.")
+
+        st.success(f"✅ Your Smoothie is ordered, {name_on_order}!")
